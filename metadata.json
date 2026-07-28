@@ -1,0 +1,6 @@
+{
+  "name": "DuelR",
+  "description": "Anime Stat Card Generator & Head-to-Head Battle Engine powered by real-life physical and mental habit metrics.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
