@@ -12,6 +12,17 @@ const PORT = 3000;
 
 app.use(express.json());
 
+// CORS & Preflight headers
+app.use((req, res, next) => {
+  res.header('Access-Control-Allow-Origin', '*');
+  res.header('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept');
+  res.header('Access-Control-Allow-Methods', 'GET, POST, OPTIONS, PUT, DELETE');
+  if (req.method === 'OPTIONS') {
+    return res.sendStatus(200);
+  }
+  next();
+});
+
 // Persistent Database File Setup
 const DB_FILE = path.join(process.cwd(), 'data_db.json');
 
@@ -494,6 +505,11 @@ Write an exciting, high-octane 3-sentence battle commentary summarizing why ${wi
     console.error('Error in /api/battle-narrative:', err);
     res.json({ commentary: `${req.body.winnerName || 'The victor'} triumphs through sheer discipline and overwhelming stat advantage!` });
   }
+});
+
+// Explicit API 404 handler to ensure /api routes ALWAYS return JSON and never Vite HTML fallback
+app.use('/api', (req, res) => {
+  res.status(404).json({ error: `API endpoint ${req.originalUrl} not found.` });
 });
 
 async function startServer() {

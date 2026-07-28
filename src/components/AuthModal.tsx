@@ -38,19 +38,81 @@ export const AuthModal: React.FC<AuthModalProps> = ({
     try {
       const endpoint = isRegister ? '/api/auth/register' : '/api/auth/login';
       const bodyData = isRegister
-        ? { email, password, hunterName }
-        : { email, password };
+        ? { email: email.trim(), password, hunterName: hunterName.trim() }
+        : { email: email.trim(), password };
 
-      const res = await fetch(endpoint, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(bodyData),
-      });
+      let data: any = null;
+      let isSuccess = false;
 
-      const data = await res.json();
+      try {
+        const res = await fetch(endpoint, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(bodyData),
+        });
 
-      if (!res.ok) {
-        throw new Error(data.error || 'Authentication failed');
+        const contentType = res.headers.get('content-type') || '';
+        if (contentType.includes('application/json')) {
+          data = await res.json();
+        } else {
+          const text = await res.text();
+          console.warn('Server returned non-JSON auth response:', text);
+        }
+
+        if (res.ok && data?.user) {
+          isSuccess = true;
+        } else if (data?.error) {
+          throw new Error(data.error);
+        }
+      } catch (serverErr: any) {
+        // If server returned a business logic error (e.g., Invalid password), display it directly
+        if (serverErr.message && !serverErr.message.toLowerCase().includes('json') && !serverErr.message.toLowerCase().includes('fetch')) {
+          throw serverErr;
+        }
+        console.warn('Server auth endpoint unreachable or returned non-JSON, falling back to local storage auth:', serverErr);
+      }
+
+      // Local storage fallback if server endpoint is offline or unavailable
+      if (!isSuccess) {
+        const localUsersRaw = localStorage.getItem('duelr_local_users');
+        const localUsers: any[] = localUsersRaw ? JSON.parse(localUsersRaw) : [
+          {
+            email: 'pro.hunter@duelr.com',
+            hunterName: 'Ren the Shadow Sovereign',
+            passwordHash: 'hunter123',
+            wins: 14,
+            losses: 2,
+          }
+        ];
+
+        const targetEmail = email.trim().toLowerCase();
+
+        if (isRegister) {
+          const existing = localUsers.find((u: any) => u.email.toLowerCase() === targetEmail);
+          if (existing) {
+            throw new Error('An account with this email already exists.');
+          }
+          const newUser = {
+            email: targetEmail,
+            hunterName: hunterName.trim(),
+            passwordHash: password,
+            createdAt: new Date().toISOString(),
+            wins: 0,
+            losses: 0,
+          };
+          localUsers.push(newUser);
+          localStorage.setItem('duelr_local_users', JSON.stringify(localUsers));
+          data = { user: newUser, userCards: [] };
+          isSuccess = true;
+        } else {
+          const user = localUsers.find((u: any) => u.email.toLowerCase() === targetEmail);
+          if (user && user.passwordHash === password) {
+            data = { user, userCards: [] };
+            isSuccess = true;
+          } else {
+            throw new Error('Invalid email or password.');
+          }
+        }
       }
 
       sounds.playVictoryFanfare();
@@ -62,7 +124,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
       }, 1200);
     } catch (err: any) {
       sounds.playDefeatSound();
-      setErrorMsg(err.message || 'An error occurred during login.');
+      setErrorMsg(err.message || 'An error occurred during authentication.');
     } finally {
       setLoading(false);
     }

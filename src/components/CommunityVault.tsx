@@ -31,7 +31,8 @@ export const CommunityVault: React.FC<CommunityVaultProps> = ({
     setLoading(true);
     try {
       const res = await fetch('/api/community-cards');
-      if (res.ok) {
+      const contentType = res.headers.get('content-type') || '';
+      if (res.ok && contentType.includes('application/json')) {
         const data = await res.json();
         setOnlineCards(data.cards || []);
       }
